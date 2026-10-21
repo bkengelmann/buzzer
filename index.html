@@ -88,6 +88,7 @@
 
   #status { font-family: var(--display); font-weight: 600; font-size: 1.9rem; text-align: center; min-height: 2.2rem; line-height: 1.1; }
   #status.win { color: var(--green); }
+  #margin { color: var(--dim); font-size: 1rem; text-align: center; min-height: 1.3em; margin-top: -18px; }
   footer { display: flex; gap: 10px; padding: 14px 0; }
   footer .btn { flex: 1; }
   #reset { border-color: var(--brass); color: var(--brass); }
@@ -116,6 +117,7 @@
   <div id="stage">
     <div id="ring"><button id="buzz" aria-label="Buzz in">Buzz</button></div>
     <div id="status" aria-live="assertive"></div>
+    <div id="margin"></div>
   </div>
   <footer>
     <button class="btn" id="leave">Leave</button>
@@ -133,7 +135,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onValue, set, remove, runTransaction, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, onValue, set, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDL_bS8CAgJs69yuAHUrb1VD1vvL3d3ivg",
@@ -160,7 +162,11 @@ const params = new URLSearchParams(location.search);
 $("name").value = store.get("buzzerName") || "";
 $("room").value = (params.get("room") || store.get("buzzerRoom") || "GAME").toUpperCase();
 
-let room, myName, winnerRef, meRef, lastBuzzKey = null, firstRender = true, ac, wakeLock;
+let room, myName, buzzesRef, meRef, lastBuzzKey = null, firstRender = true, ac, wakeLock;
+// Judging: each phone stamps its own press time (corrected to server clock),
+// then everyone waits a short window and the earliest press time wins.
+const JUDGE_MS = 500;
+let offset = 0, buzzes = {}, judgeTimer = null, judged = false, pressedThisRound = false;
 
 $("joinBtn").addEventListener("click", join);
 $("name").addEventListener("keydown", e => { if (e.key === "Enter") join(); });
@@ -198,14 +204,50 @@ function join() {
     $("count").textContent = n + (n === 1 ? " player" : " players");
   });
 
-  winnerRef = ref(db, `rooms/${room}/winner`);
-  onValue(winnerRef, snap => render(snap.val()));
+  // Difference between this phone's clock and Firebase's clock
+  onValue(ref(db, ".info/serverTimeOffset"), s => { offset = s.val() || 0; });
+
+  buzzesRef = ref(db, `rooms/${room}/buzzes`);
+  onValue(buzzesRef, snap => {
+    buzzes = snap.val() || {};
+    if (Object.keys(buzzes).length === 0) {
+      clearTimeout(judgeTimer); judgeTimer = null;
+      judged = false; pressedThisRound = false;
+      render(null);
+      return;
+    }
+    if (firstRender) judged = true; // joined mid-round: show result as-is
+    if (judged) {
+      render(ranking());
+    } else if (!judgeTimer) {
+      showJudging();
+      judgeTimer = setTimeout(() => { judged = true; judgeTimer = null; render(ranking()); }, JUDGE_MS);
+    }
+  });
 }
 
-function render(w) {
+function ranking() {
+  return Object.entries(buzzes)
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
+}
+
+function showJudging() {
+  const b = $("buzz");
+  b.classList.remove("win", "lose");
+  b.textContent = "…";
+  $("status").textContent = "";
+  $("margin").textContent = "";
+}
+
+function render(list) {
+  const w = list && list[0];
   const b = $("buzz"), s = $("status");
   b.classList.remove("win", "lose");
   s.classList.remove("win");
+  $("margin").textContent = list && list.length > 1
+    ? list.slice(1).map(p => `${p.id === myId ? "You" : p.name} +${((p.t - w.t) / 1000).toFixed(2)}s`).join(", ")
+    : "";
   if (!w) {
     b.textContent = "Buzz";
     s.textContent = "";
@@ -236,17 +278,18 @@ function render(w) {
 const buzzBtn = $("buzz");
 buzzBtn.addEventListener("pointerdown", e => {
   e.preventDefault();
-  if (!winnerRef) return;
+  if (!buzzesRef || judged || pressedThisRound) return;
+  const t = Date.now() + offset; // press time on the shared server clock
+  pressedThisRound = true;
   buzzBtn.classList.add("pressed");
-  // Server-side transaction: only the first write wins
-  runTransaction(winnerRef, cur => cur ? undefined : { id: myId, name: myName, t: Date.now() })
-    .catch(() => { $("status").textContent = "Connection problem. Check signal and try again."; });
+  set(ref(db, `rooms/${room}/buzzes/${myId}`), { name: myName, t })
+    .catch(() => { pressedThisRound = false; $("status").textContent = "Connection problem. Check signal and try again."; });
 });
 ["pointerup", "pointercancel", "pointerleave"].forEach(ev =>
   buzzBtn.addEventListener(ev, () => buzzBtn.classList.remove("pressed")));
 buzzBtn.addEventListener("contextmenu", e => e.preventDefault());
 
-$("reset").addEventListener("click", () => winnerRef && remove(winnerRef));
+$("reset").addEventListener("click", () => buzzesRef && remove(buzzesRef));
 
 $("leave").addEventListener("click", async () => {
   try { await remove(meRef); } catch {}
