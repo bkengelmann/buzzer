@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#160b10">
+<title>Buzzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --velvet: #160b10;
+    --curtain: #24121a;
+    --seam: #3d2430;
+    --brass: #c9a24a;
+    --ivory: #efe6d4;
+    --dim: #9a8a80;
+    --red: #d4162c;
+    --green: #22c25f;
+    --display: "Big Shoulders Display", Impact, "Arial Narrow", sans-serif;
+    --body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overscroll-behavior: none; }
+  body {
+    background: radial-gradient(ellipse at 50% 35%, #2c1520 0%, var(--velvet) 70%);
+    color: var(--ivory);
+    font-family: var(--body);
+    padding: env(safe-area-inset-top, 0px) 18px env(safe-area-inset-bottom, 0px);
+    display: flex; flex-direction: column;
+    user-select: none; -webkit-user-select: none;
+  }
+  .hidden { display: none !important; }
+
+  /* Join screen */
+  #join { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 18px; width: 100%; max-width: 380px; margin: 0 auto; }
+  h1 { font-family: var(--display); font-weight: 900; font-size: 4.2rem; line-height: .9; margin: 0 0 10px; color: var(--brass); text-align: center; }
+  .field span { font-size: .9rem; color: var(--dim); }
+  input {
+    display: block; width: 100%; margin-top: 6px; padding: 14px;
+    font: 600 1.15rem var(--body); color: var(--ivory);
+    background: var(--curtain); border: 1px solid var(--seam); border-radius: 10px;
+    user-select: text; -webkit-user-select: text;
+  }
+  input:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
+  .btn {
+    padding: 14px 16px; font: 600 1rem var(--body); color: var(--ivory);
+    background: var(--curtain); border: 1px solid var(--seam); border-radius: 10px;
+    touch-action: manipulation;
+  }
+  .btn:focus-visible { outline: 2px solid var(--brass); }
+  .btn.go { background: var(--brass); color: var(--velvet); border-color: var(--brass); font-size: 1.1rem; }
+  #err { color: #ff7a7a; font-size: .9rem; min-height: 1.2em; text-align: center; }
+
+  /* Game screen */
+  #game { flex: 1; display: flex; flex-direction: column; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; font-size: .95rem; color: var(--dim); }
+  #roomName { font-family: var(--display); font-weight: 900; font-size: 1.6rem; color: var(--brass); }
+  #conn { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #666; margin-right: 6px; vertical-align: middle; }
+  #conn.on { background: var(--green); }
+  #stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; }
+
+  #ring {
+    padding: 14px; border-radius: 50%;
+    background: conic-gradient(from 200deg, #8a6a24, var(--brass), #f3d98a, var(--brass), #8a6a24, var(--brass), #8a6a24);
+    box-shadow: 0 30px 60px rgba(0,0,0,.7);
+  }
+  #buzz {
+    display: block; width: min(72vw, 48vh); aspect-ratio: 1; border-radius: 50%; border: none;
+    font-family: var(--display); font-weight: 900; font-size: clamp(2.4rem, 12vw, 4rem); color: #fff;
+    text-shadow: 0 2px 0 rgba(0,0,0,.35);
+    background: radial-gradient(circle at 38% 30%, #ff6070 0%, var(--red) 42%, #6e0612 100%);
+    box-shadow: inset 0 -14px 0 rgba(0,0,0,.35), inset 0 6px 14px rgba(255,255,255,.25);
+    transition: transform .05s, box-shadow .05s, background .15s;
+    touch-action: manipulation; cursor: pointer;
+  }
+  #buzz.pressed { transform: scale(.96); box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), inset 0 10px 20px rgba(0,0,0,.3); }
+  #buzz.win {
+    background: radial-gradient(circle at 38% 30%, #7dffaa 0%, var(--green) 42%, #08592a 100%);
+    animation: glow 1.2s ease-in-out infinite alternate;
+  }
+  #buzz.lose { background: radial-gradient(circle at 38% 30%, #6a5e62 0%, #3e3438 45%, #1c1518 100%); color: #8a7f82; text-shadow: none; }
+  @keyframes glow { from { filter: brightness(1); } to { filter: brightness(1.18); } }
+  @media (prefers-reduced-motion: reduce) { #buzz.win { animation: none; } }
+
+  #status { font-family: var(--display); font-weight: 600; font-size: 1.9rem; text-align: center; min-height: 2.2rem; line-height: 1.1; }
+  #status.win { color: var(--green); }
+  footer { display: flex; gap: 10px; padding: 14px 0; }
+  footer .btn { flex: 1; }
+  #reset { border-color: var(--brass); color: var(--brass); }
+
+  /* Share overlay */
+  #share { position: fixed; inset: 0; background: rgba(10,4,7,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; }
+  #qr { background: #fff; padding: 14px; border-radius: 12px; }
+  #shareUrl { color: var(--dim); font-size: .9rem; word-break: break-all; text-align: center; max-width: 320px; }
+</style>
+</head>
+<body>
+
+<section id="join">
+  <h1>Buzzer</h1>
+  <label class="field"><span>Your name</span><input id="name" maxlength="20" autocomplete="off" placeholder="Brian"></label>
+  <label class="field"><span>Room code (everyone uses the same one)</span><input id="room" maxlength="12" autocomplete="off" autocapitalize="characters"></label>
+  <button class="btn go" id="joinBtn">Join room</button>
+  <div id="err"></div>
+</section>
+
+<section id="game" class="hidden">
+  <header>
+    <div><span id="conn"></span><span id="roomName"></span></div>
+    <div id="count">1 player</div>
+  </header>
+  <div id="stage">
+    <div id="ring"><button id="buzz" aria-label="Buzz in">Buzz</button></div>
+    <div id="status" aria-live="assertive"></div>
+  </div>
+  <footer>
+    <button class="btn" id="leave">Leave</button>
+    <button class="btn" id="shareBtn">Invite</button>
+    <button class="btn" id="reset">Reset</button>
+  </footer>
+</section>
+
+<div id="share" class="hidden">
+  <div id="qr"></div>
+  <div id="shareUrl"></div>
+  <button class="btn" id="closeShare">Close</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, set, remove, runTransaction, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDL_bS8CAgJs69yuAHUrb1VD1vvL3d3ivg",
+  authDomain: "buzzer-5171f.firebaseapp.com",
+  databaseURL: "https://buzzer-5171f-default-rtdb.firebaseio.com",
+  projectId: "buzzer-5171f",
+  storageBucket: "buzzer-5171f.firebasestorage.app",
+  messagingSenderId: "52075680610",
+  appId: "1:52075680610:web:b5f11b8f09b5b3a0f7923b"
+};
+const db = getDatabase(initializeApp(firebaseConfig));
+
+const $ = id => document.getElementById(id);
+const store = {
+  get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }
+};
+
+// Stable per-device id so a refresh keeps the same player
+let myId = store.get("buzzerId");
+if (!myId) { myId = Math.random().toString(36).slice(2, 10); store.set("buzzerId", myId); }
+
+const params = new URLSearchParams(location.search);
+$("name").value = store.get("buzzerName") || "";
+$("room").value = (params.get("room") || store.get("buzzerRoom") || "GAME").toUpperCase();
+
+let room, myName, winnerRef, meRef, lastBuzzKey = null, firstRender = true, ac, wakeLock;
+
+$("joinBtn").addEventListener("click", join);
+$("name").addEventListener("keydown", e => { if (e.key === "Enter") join(); });
+$("room").addEventListener("keydown", e => { if (e.key === "Enter") join(); });
+
+function join() {
+  myName = $("name").value.trim().slice(0, 20);
+  room = $("room").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
+  if (!myName) { $("err").textContent = "Enter a name so others know who buzzed."; $("name").focus(); return; }
+  if (!room) { $("err").textContent = "Enter a room code using letters or numbers."; $("room").focus(); return; }
+  store.set("buzzerName", myName);
+  store.set("buzzerRoom", room);
+  history.replaceState(null, "", "?room=" + room);
+
+  $("join").classList.add("hidden");
+  $("game").classList.remove("hidden");
+  $("roomName").textContent = room;
+
+  unlockAudio();
+  keepAwake();
+
+  // Presence: add me, remove me automatically if I disconnect
+  meRef = ref(db, `rooms/${room}/players/${myId}`);
+  onValue(ref(db, ".info/connected"), snap => {
+    const on = snap.val() === true;
+    $("conn").classList.toggle("on", on);
+    if (on) {
+      onDisconnect(meRef).remove();
+      set(meRef, { name: myName, joined: serverTimestamp() });
+    }
+  });
+
+  onValue(ref(db, `rooms/${room}/players`), snap => {
+    const n = snap.size;
+    $("count").textContent = n + (n === 1 ? " player" : " players");
+  });
+
+  winnerRef = ref(db, `rooms/${room}/winner`);
+  onValue(winnerRef, snap => render(snap.val()));
+}
+
+function render(w) {
+  const b = $("buzz"), s = $("status");
+  b.classList.remove("win", "lose");
+  s.classList.remove("win");
+  if (!w) {
+    b.textContent = "Buzz";
+    s.textContent = "";
+    lastBuzzKey = null;
+  } else if (w.id === myId) {
+    b.classList.add("win");
+    b.textContent = "First";
+    s.textContent = "You buzzed first";
+    s.classList.add("win");
+  } else {
+    b.classList.add("lose");
+    b.textContent = "Locked";
+    s.textContent = (w.name || "Someone") + " buzzed first";
+  }
+  // Sound + vibration once per new buzz (not on initial load)
+  if (w) {
+    const key = w.id + ":" + w.t;
+    if (key !== lastBuzzKey && !firstRender) {
+      buzzSound();
+      if (navigator.vibrate) navigator.vibrate(w.id === myId ? [90, 50, 90] : 60);
+    }
+    lastBuzzKey = key;
+  }
+  firstRender = false;
+}
+
+// Buzz on touch-down, not release, to shave reaction time
+const buzzBtn = $("buzz");
+buzzBtn.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  if (!winnerRef) return;
+  buzzBtn.classList.add("pressed");
+  // Server-side transaction: only the first write wins
+  runTransaction(winnerRef, cur => cur ? undefined : { id: myId, name: myName, t: Date.now() })
+    .catch(() => { $("status").textContent = "Connection problem. Check signal and try again."; });
+});
+["pointerup", "pointercancel", "pointerleave"].forEach(ev =>
+  buzzBtn.addEventListener(ev, () => buzzBtn.classList.remove("pressed")));
+buzzBtn.addEventListener("contextmenu", e => e.preventDefault());
+
+$("reset").addEventListener("click", () => winnerRef && remove(winnerRef));
+
+$("leave").addEventListener("click", async () => {
+  try { await remove(meRef); } catch {}
+  location.href = location.pathname + "?room=" + room;
+});
+
+$("shareBtn").addEventListener("click", () => {
+  const url = location.origin + location.pathname + "?room=" + room;
+  $("qr").innerHTML = "";
+  if (window.QRCode) new QRCode($("qr"), { text: url, width: 220, height: 220 });
+  $("shareUrl").textContent = url;
+  $("share").classList.remove("hidden");
+});
+$("closeShare").addEventListener("click", () => $("share").classList.add("hidden"));
+
+// Audio must be unlocked by a tap on iPhone
+function unlockAudio() {
+  try { ac = new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch {}
+}
+function buzzSound() {
+  if (!ac) return;
+  const now = ac.currentTime;
+  const o1 = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain();
+  o1.type = "sawtooth"; o1.frequency.value = 140;
+  o2.type = "square";   o2.frequency.value = 147;
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.25, now + 0.02);
+  g.gain.setValueAtTime(0.25, now + 0.5);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
+  o1.connect(g); o2.connect(g); g.connect(ac.destination);
+  o1.start(now); o2.start(now); o1.stop(now + 0.7); o2.stop(now + 0.7);
+}
+
+// Keep screen on while playing
+async function keepAwake() {
+  try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch {}
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && room) { keepAwake(); if (ac) ac.resume(); }
+});
+</script>
+</body>
+</html>
